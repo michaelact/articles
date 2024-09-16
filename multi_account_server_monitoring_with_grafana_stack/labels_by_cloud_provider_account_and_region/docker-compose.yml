@@ -1,0 +1,26 @@
+services:
+  grafana-alloy:
+    image: grafana/alloy:v1.3.1
+    container_name: grafana-alloy
+    restart: always
+    hostname: ${HOSTNAME}
+    environment:
+      - PROMETHEUS_REMOTE_WRITE_URL=${PROMETHEUS_REMOTE_WRITE_URL}
+      - PROMETHEUS_REMOTE_WRITE_USERNAME=${PROMETHEUS_REMOTE_WRITE_USERNAME}
+      - PROMETHEUS_REMOTE_WRITE_PASSWORD=${PROMETHEUS_REMOTE_WRITE_PASSWORD}
+      - HOSTNAME=${HOSTNAME}
+    volumes:
+      - '/:/host:ro,rslave'
+      - '/sys:/sys:ro,rslave'
+      - './config/grafana.alloy:/etc/alloy/grafana.alloy:ro'
+    command:
+      - 'run'
+      - '--stability.level=public-preview'
+      - '/etc/alloy/grafana.alloy'
+    mem_limit: 256M
+    privileged: true
+
+networks:
+  default:
+    name: monitoring
+    external: true

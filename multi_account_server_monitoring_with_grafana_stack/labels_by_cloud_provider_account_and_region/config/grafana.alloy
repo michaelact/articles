@@ -1,0 +1,63 @@
+logging {
+  level = "error"
+}
+
+// Install node-exporter
+prometheus.exporter.unix "default" {
+  set_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev", "netstat", "stat", "time", "uname"]
+  rootfs_path    = "/host"
+}
+
+// Scrape metrics from the exporter
+prometheus.scrape "default" {
+  scrape_interval   = "1m"
+  scrape_timeout    = "1m"
+  targets           = concat(prometheus.exporter.unix.default.targets)
+  forward_to        = [prometheus.relabel.default.receiver]
+}
+
+// Get AWS account ID
+remote.http "instance_identity" {
+  url = http://169.254.169.254/latest/dynamic/instance-identity/document
+}
+
+// Add AWS metadata to metrics
+prometheus.relabel "default" {
+  forward_to = [
+    prometheus.remote_write.default.receiver,
+  ]
+
+  rule {
+    action       = "replace"
+    target_label = "cloud"
+    replacement  = "AWS"
+  }
+
+  rule {
+    action       = "replace"
+    target_label = "cloud_account_id"
+    replacement  = json_decode(remote.http.instance_identity.content).accountId
+  }
+
+  rule {
+    action       = "replace"
+    target_label = "cloud_region"
+    replacement  = json_decode(remote.http.instance_identity.content).region
+  }
+}
+
+// Send metrics to a Prometheus remote_write endpoint.
+prometheus.remote_write "default" {
+  endpoint {
+    url = env("PROMETHEUS_REMOTE_WRITE_URL")
+
+    metadata_config {
+      send_interval = "1m"
+    }
+
+    basic_auth {
+      username = env("PROMETHEUS_REMOTE_WRITE_USERNAME")
+      password = env("PROMETHEUS_REMOTE_WRITE_PASSWORD")
+    }
+  }
+}

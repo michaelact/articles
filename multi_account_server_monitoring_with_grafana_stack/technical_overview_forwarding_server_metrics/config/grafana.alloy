@@ -1,0 +1,33 @@
+logging {
+  level = "error"
+}
+
+// Install node-exporter
+prometheus.exporter.unix "default" {
+  set_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev", "netstat", "stat", "time", "uname"]
+  rootfs_path    = "/host"
+}
+
+// Scrape metrics from above exporter
+prometheus.scrape "default" {
+  scrape_interval   = "1m"
+  scrape_timeout    = "1m"
+  targets           = concat(prometheus.exporter.unix.default.targets)
+  forward_to        = [prometheus.remote_write.default.receiver]
+}
+
+// Send metrics to a Prometheus remote_write endpoint.
+prometheus.remote_write "default" {
+  endpoint {
+    url = env("PROMETHEUS_REMOTE_WRITE_URL")
+
+    metadata_config {
+      send_interval = "1m"
+    }
+
+    basic_auth {
+      username = env("PROMETHEUS_REMOTE_WRITE_USERNAME")
+      password = env("PROMETHEUS_REMOTE_WRITE_PASSWORD")
+    }
+  }
+}
